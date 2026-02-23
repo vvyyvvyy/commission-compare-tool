@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>傭金實質報酬比較工具</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+            rel="stylesheet">
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap');
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            /* 加入 subtle 背景紋理 */
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* 卡片基礎樣式優化，加入懸浮立體感 */
+        .card { 
+            @apply bg-white/95 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-slate-100 transition-all duration-300 hover:shadow-md; 
+        }
+        
+        .input-label { @apply flex items-center text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider; }
+        .input-label i { @apply mr-2 text-blue-400; }
+        
+        /* 輸入框優化，加入 focus 時的輕微發光 */
+        .input-field { @apply border border-slate-300 rounded-lg px-1 py-1.5 focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 outline-none text-center bg-slate-50/50 transition-all; }
+        
+        /* Grid 佈局維持不變 */
+        .year-row-grid { 
+            display: grid; 
+            grid-template-columns: 4rem 1.5rem 4rem 1.5rem 4.8rem 1.2rem 2.5rem; 
+            align-items: center; 
+            justify-content: start;
+            gap: 0.4rem;
+            margin-bottom: 0.6rem;
+            /* 加入新增/刪除時的過渡動畫 */
+            transition: all 0.3s ease-in-out;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .level-row-grid {
+            display: grid;
+            grid-template-columns: 4rem 1.5rem 4rem 1.5rem 4.8rem 1.2rem 2.5rem;
+            align-items: center;
+            justify-content: start;
+            gap: 0.4rem;
+            margin-bottom: 0.7rem;
+        }
+        
+        /* 用於 JS 控制新增時的初始狀態 */
+        .row-enter { opacity: 0; transform: translateY(-10px); }
+        /* 用於 JS 控制刪除時的狀態 */
+        .row-leave { opacity: 0; transform: translateY(-10px); height: 0 !important; margin: 0 !important; overflow: hidden; }
+
+        /* 按鈕樣式升級，加入漸層與呼吸燈動畫 */
+        .btn-primary { 
+            @apply bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-lg hover:shadow-blue-500/30 active:scale-95 relative overflow-hidden; 
+        }
+        .btn-primary::after {
+            content: ''; @apply absolute inset-0 bg-white/20 opacity-0 transition-opacity hover:opacity-100;
+        }
+        @keyframes pulse-soft { 0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); } }
+        .animate-pulse-soft { animation: pulse-soft 2s infinite; }
+
+        /* 勝利者獎杯動畫 */
+        @keyframes pop-in { 0% { transform: scale(0) rotate(-20deg); opacity: 0; } 70% { transform: scale(1.2) rotate(10deg); } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+        .winner-icon { animation: pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+        /* 頁面載入動畫 */
+        .fade-up { animation: fadeUp 0.6s ease-out forwards; opacity: 0; transform: translateY(20px); }
+        @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
+    </style>
+    </head>
+    <body class="py-12 px-4">
+
+        <div class="max-w-5xl mx-auto">
+            <header class="text-center mb-10 fade-up">
+                <div
+                    class="inline-flex items-center justify-center bg-blue-100 p-4 rounded-full mb-4 shadow-sm">
+                    <i
+                        class="fa-solid fa-scale-balanced text-3xl text-blue-600"></i>
+                </div>
+                <h1
+                    class="text-4xl font-extrabold text-slate-800 tracking-tight">
+                    商品傭金實質報酬比較
+                </h1>
+                <p class="text-slate-500 mt-2 font-medium">考量通膨因素，精準計算真實價值終值
+                    (Future Value)</p>
+            </header>
+
+            <div
+                class="card mb-8 grid grid-cols-1 md:grid-cols-2 gap-8 border-b-4 border-b-blue-500/30 fade-up delay-100">
+                <div>
+                    <label class="input-label"><i
+                            class="fa-solid fa-sack-dollar"></i> 基準保額 (Total
+                        Coverage)</label>
+                    <div class="relative">
+                        <span
+                            class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                        <input type="number" id="coverage" value="10000"
+                            class="input-field text-left pl-8 pr-4 py-3 w-full text-xl font-bold bg-blue-50/30 border-blue-200">
+                    </div>
+                </div>
+                <div>
+                    <label class="input-label"><i
+                            class="fa-solid fa-arrow-trend-up"></i> 預計年通膨率
+                        (%)</label>
+                    <div class="relative">
+                        <input type="number" id="inflation" value="2" step="0.1"
+                            class="input-field text-left pl-4 pr-8 py-3 w-full text-xl font-bold bg-red-50/30 border-red-200">
+                        <span
+                            class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 fade-up delay-200">
+                <div
+                    class="card border-t-8 border-t-blue-500 relative overflow-hidden group">
+                    <div
+                        class="absolute top-0 right-0 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <i
+                            class="fa-solid fa-building-shield text-8xl text-blue-500 transform rotate-12 translate-x-4 -translate-y-4"></i>
+                    </div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-blue-100 p-2 rounded-lg mr-3"><i
+                                class="fa-solid fa-A text-blue-600 text-xl font-black"></i></div>
+                        <input type="text" id="nameA" value="商品 A"
+                            class="font-bold text-2xl border-b-2 border-transparent hover:border-blue-300 focus:border-blue-500 outline-none w-full pb-1 bg-transparent transition-all z-10">
+                    </div>
+
+                    <div class="level-row-grid relative z-10">
+                        <span
+                            class="text-[15px] text-slate-500 font-bold uppercase tracking-wider flex items-center"><i
+                                class="fa-solid fa-user-tie mr-1 text-blue-500"></i>職級</span>
+                        <span></span>
+                        <div class="col-span-3">
+                            <input type="number" id="levelA" min="0" max="100"
+                                step="1" value="100"
+                                class="input-field w-full text-left px-3 py-2.5 text-base font-bold text-blue-700 bg-blue-50/70 border-blue-200">
+                        </div>
+                        <span
+                            class="text-slate-400 text-sm text-center font-bold">%</span>
+                        <span></span>
+                    </div>
+
+                    <div
+                        class="year-row-grid text-[10px] text-slate-400 font-bold mb-2 px-1 uppercase tracking-wider z-10 relative">
+                        <span><i
+                                class="fa-regular fa-calendar-play mr-1"></i>起始</span><span></span><span><i
+                                class="fa-regular fa-calendar-check mr-1"></i>結束</span><span></span><span><i
+                                class="fa-solid fa-percent mr-1"></i>領取</span><span></span><span></span>
+                    </div>
+
+                    <div id="containerA" class="relative z-10 min-h-[50px]">
+                        <div class="year-row-grid">
+                            <input type="number"
+                                class="input-field start-yr font-medium"
+                                value="1">
+                            <span class="text-center text-slate-300"><i
+                                    class="fa-solid fa-arrow-right-long text-xs"></i></span>
+                            <input type="number"
+                                class="input-field end-yr font-medium"
+                                value="1">
+                            <span
+                                class="text-center text-slate-400 text-xs font-medium">領</span>
+                            <input type="number"
+                                class="input-field percent font-bold text-blue-600 w-full"
+                                value="10">
+                            <span class="text-slate-400 text-sm">%</span>
+                            <button onclick="removeRow(this)"
+                                class="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full w-8 h-8 flex items-center justify-center transition-all ml-1"><i
+                                    class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <button onclick="addRow('containerA')"
+                        class="mt-6 py-2 px-4 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-lg text-sm font-bold flex items-center transition-all relative z-10">
+                        <i class="fa-solid fa-plus mr-2"></i> 新增年份區間
+                    </button>
+                </div>
+
+                <div
+                    class="card border-t-8 border-t-emerald-500 relative overflow-hidden group">
+                    <div
+                        class="absolute top-0 right-0 opacity-5 group-hover:opacity-10 transition-opacity">
+                        <i
+                            class="fa-solid fa-building-lock text-8xl text-emerald-500 transform rotate-12 translate-x-4 -translate-y-4"></i>
+                    </div>
+                    <div class="flex items-center mb-6">
+                        <div class="bg-emerald-100 p-2 rounded-lg mr-3"><i
+                                class="fa-solid fa-B text-emerald-600 text-xl font-black"></i></div>
+                        <input type="text" id="nameB" value="商品 B"
+                            class="font-bold text-2xl border-b-2 border-transparent hover:border-emerald-300 focus:border-emerald-500 outline-none w-full pb-1 bg-transparent transition-all z-10">
+                    </div>
+
+                    <div class="level-row-grid relative z-10">
+                        <span
+                            class="text-[15px] text-slate-500 font-bold uppercase tracking-wider flex items-center"><i
+                                class="fa-solid fa-user-tie mr-1 text-emerald-500"></i>職級</span>
+                        <span></span>
+                        <div class="col-span-3">
+                            <input type="number" id="levelB" min="0" max="100"
+                                step="1" value="100"
+                                class="input-field w-full text-left px-3 py-2.5 text-base font-bold text-emerald-700 bg-emerald-50/70 border-emerald-200">
+                        </div>
+                        <span
+                            class="text-slate-400 text-sm text-center font-bold">%</span>
+                        <span></span>
+                    </div>
+
+                    <div
+                        class="year-row-grid text-[10px] text-slate-400 font-bold mb-2 px-1 uppercase tracking-wider z-10 relative">
+                        <span><i
+                                class="fa-regular fa-calendar-play mr-1"></i>起始</span><span></span><span><i
+                                class="fa-regular fa-calendar-check mr-1"></i>結束</span><span></span><span><i
+                                class="fa-solid fa-percent mr-1"></i>領取</span><span></span><span></span>
+                    </div>
+
+                    <div id="containerB" class="relative z-10 min-h-[50px]">
+                        <div class="year-row-grid">
+                            <input type="number"
+                                class="input-field start-yr font-medium"
+                                value="1">
+                            <span class="text-center text-slate-300"><i
+                                    class="fa-solid fa-arrow-right-long text-xs"></i></span>
+                            <input type="number"
+                                class="input-field end-yr font-medium"
+                                value="5">
+                            <span
+                                class="text-center text-slate-400 text-xs font-medium">領</span>
+                            <input type="number"
+                                class="input-field percent font-bold text-emerald-600 w-full"
+                                value="2">
+                            <span class="text-slate-400 text-sm">%</span>
+                            <button onclick="removeRow(this)"
+                                class="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full w-8 h-8 flex items-center justify-center transition-all ml-1"><i
+                                    class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
+                    <button onclick="addRow('containerB')"
+                        class="mt-6 py-2 px-4 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700 rounded-lg text-sm font-bold flex items-center transition-all relative z-10">
+                        <i class="fa-solid fa-plus mr-2"></i> 新增年份區間
+                    </button>
+                </div>
+            </div>
+
+            <div class="text-center mb-16 fade-up delay-300">
+                <button onclick="calculate()"
+                    class="btn-primary animate-pulse-soft">
+                    <i class="fa-solid fa-calculator mr-3"></i> 開始計算實質價值比較
+                </button>
+            </div>
+
+            <div id="resultSection"
+                class="hidden transition-all duration-700 opacity-0 translate-y-10">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
+                    <div class="card lg:col-span-2 flex flex-col">
+                        <h3
+                            class="font-bold text-lg text-slate-700 mb-6 flex items-center">
+                            <i
+                                class="fa-solid fa-chart-column mr-2 text-blue-500"></i>
+                            實質價值終值 (Future Value) 比較
+                        </h3>
+                        <div class="flex-grow" style="min-height: 300px;">
+                            <canvas id="resultChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div
+                        class="card bg-gradient-to-br from-slate-800 to-slate-900 text-white border-none shadow-xl shadow-slate-800/30 flex flex-col justify-center items-center text-center relative overflow-hidden p-8">
+                        <i
+                            class="fa-solid fa-award absolute -top-10 -right-10 text-[10rem] text-white/5 rotate-12"></i>
+
+                        <div id="winnerIconContainer"
+                            class="mb-4 h-16 flex items-center justify-center"></div>
+
+                        <div id="winnerBadge" class="mb-6 relative z-10"></div>
+
+                        <p id="diffText"
+                            class="text-slate-300 leading-relaxed relative z-10 bg-white/10 p-4 rounded-xl backdrop-blur-sm"></p>
+
+                        <div id="targetLabel"
+                            class="mt-auto pt-6 border-t border-white/10 text-xs text-slate-400 w-full flex items-center justify-center">
+                            <i class="fa-regular fa-clock mr-2"></i>
+                            <span>價值基準點</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        let myChart = null;
+
+        // 新增行 (包含動畫)
+        function addRow(containerId) {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            // 初始加入 row-enter class 讓它隱藏並位移
+            div.className = 'year-row-grid row-enter';
+            
+            const isTypeB = containerId === 'containerB';
+            const highlightColor = isTypeB ? 'text-emerald-600' : 'text-blue-600';
+
+            div.innerHTML = `
+                <input type="number" class="input-field start-yr font-medium">
+                <span class="text-center text-slate-300"><i class="fa-solid fa-arrow-right-long text-xs"></i></span>
+                <input type="number" class="input-field end-yr font-medium">
+                <span class="text-center text-slate-400 text-xs font-medium">領</span>
+                <input type="number" class="input-field percent font-bold ${highlightColor} w-full">
+                <span class="text-slate-400 text-sm">%</span>
+                <button onclick="removeRow(this)" class="text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full w-8 h-8 flex items-center justify-center transition-all ml-1"><i class="fa-solid fa-xmark"></i></button>
+            `;
+            container.appendChild(div);
+
+            // 強制瀏覽器重繪後移除 class，觸發 transition 動畫
+            requestAnimationFrame(() => {
+                div.classList.remove('row-enter');
+            });
+        }
+
+        // 刪除行 (包含動畫)
+        function removeRow(button) {
+            const row = button.parentElement;
+            row.classList.add('row-leave'); // 加入退場動畫 class
+            // 等待動畫結束後再從 DOM 移除
+            setTimeout(() => {
+                row.remove();
+            }, 300); // 這裡的時間要跟 CSS transition 時間一致
+        }
+
+        function getData(containerId, coverage, level) {
+            // 只選取沒有在退場中的行
+            const rows = document.getElementById(containerId).querySelectorAll('.year-row-grid:not(.row-leave)');
+            let cashFlows = [];
+            let maxYear = 0;
+            rows.forEach(row => {
+                const s = parseInt(row.querySelector('.start-yr').value);
+                const e = parseInt(row.querySelector('.end-yr').value);
+                const p = parseFloat(row.querySelector('.percent').value);
+                if (!isNaN(s) && !isNaN(e) && !isNaN(p) && s > 0 && e >= s) {
+                    for (let y = s; y <= e; y++) {
+                        cashFlows.push({ yr: y, amt: coverage * (p / 100) * level });
+                        if (y > maxYear) maxYear = y;
+                    }
+                }
+            });
+            return { cashFlows, maxYear };
+        }
+
+        function calculate() {
+            const coverageInput = document.getElementById('coverage').value;
+            const inflationInput = document.getElementById('inflation').value;
+            
+            if(!coverageInput || !inflationInput) {
+                 alert("請輸入保額與通膨率"); return;
+            }
+            
+            const coverage = parseFloat(coverageInput);
+            const inflation = parseFloat(inflationInput) / 100;
+            const levelARaw = parseFloat(document.getElementById('levelA').value);
+            const levelBRaw = parseFloat(document.getElementById('levelB').value);
+
+            if (
+                isNaN(levelARaw) || isNaN(levelBRaw) ||
+                levelARaw < 0 || levelARaw > 100 ||
+                levelBRaw < 0 || levelBRaw > 100
+            ) {
+                return alert("職級請輸入 0 到 100 之間的數值");
+            }
+
+            const levelA = levelARaw / 100;
+            const levelB = levelBRaw / 100;
+
+            const dataA = getData('containerA', coverage, levelA);
+            const dataB = getData('containerB', coverage, levelB);
+            const target = Math.max(dataA.maxYear, dataB.maxYear);
+
+            if (target === 0) return alert("請至少輸入一段有效的領取區間 (起始年須大於0且小於等於結束年)");
+
+            const getFV = (data) => data.cashFlows.reduce((sum, cf) => sum + cf.amt * Math.pow(1 + inflation, target - cf.yr), 0);
+
+            const vA = getFV(dataA);
+            const vB = getFV(dataB);
+
+            showUI(vA, vB, target, coverage);
+        }
+
+        function showUI(vA, vB, target, coverage) {
+            const resultSection = document.getElementById('resultSection');
+            resultSection.classList.remove('hidden');
+            // 觸發結果區塊的滑入動畫
+            setTimeout(() => {
+                 resultSection.classList.remove('opacity-0', 'translate-y-10');
+            }, 10);
+
+            const nA = document.getElementById('nameA').value;
+            const nB = document.getElementById('nameB').value;
+            const badge = document.getElementById('winnerBadge');
+            const iconContainer = document.getElementById('winnerIconContainer');
+            const diff = Math.abs(vA - vB);
+
+            iconContainer.innerHTML = ''; // Clear previous icon
+
+            if (vA > vB) {
+                iconContainer.innerHTML = `<i class="fa-solid fa-trophy text-5xl text-yellow-400 winner-icon"></i>`;
+                badge.innerHTML = `<span class="text-sm text-blue-300 font-bold uppercase block mb-1 tracking-widest">Winner</span><h2 class="text-3xl font-black text-white tracking-tight">${nA}</h2>`;
+                badge.classList.add('winner-icon'); // Add pop animation
+            } else if (vB > vA) {
+                iconContainer.innerHTML = `<i class="fa-solid fa-trophy text-5xl text-yellow-400 winner-icon"></i>`;
+                badge.innerHTML = `<span class="text-sm text-emerald-300 font-bold uppercase block mb-1 tracking-widest">Winner</span><h2 class="text-3xl font-black text-white tracking-tight">${nB}</h2>`;
+                badge.classList.add('winner-icon');
+            } else {
+                iconContainer.innerHTML = `<i class="fa-solid fa-handshake text-5xl text-slate-400 winner-icon"></i>`;
+                badge.innerHTML = `<h2 class="text-3xl font-black text-slate-300">平分秋色</h2>`;
+                badge.classList.add('winner-icon');
+            }
+
+            // Remove animation class after it plays so it can replay
+            setTimeout(() => { badge.classList.remove('winner-icon'); }, 700);
+
+            document.getElementById('diffText').innerHTML = `
+                <div class="mb-2 text-sm text-slate-300">在第 <strong class="text-white">${target}</strong> 年的實質價值差距</div>
+                <div class="text-2xl font-black text-yellow-400 my-1">$${diff.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+                <div class="text-xs text-slate-400">約佔總保額的 ${(diff/coverage*100).toFixed(2)}%</div>
+            `;
+            document.getElementById('targetLabel').innerHTML = `<i class="fa-solid fa-circle-info mr-2"></i> <span>所有金額皆已折算至第 <strong>${target}</strong> 年之終值</span>`;
+
+            // Chart.js 繪圖
+            const ctx = document.getElementById('resultChart').getContext('2d');
+            if (myChart) myChart.destroy();
+
+            // 設定漸層顏色
+            let gradientA = ctx.createLinearGradient(0, 0, 0, 400);
+            gradientA.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
+            gradientA.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
+            
+            let gradientB = ctx.createLinearGradient(0, 0, 0, 400);
+            gradientB.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
+            gradientB.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: [nA, nB],
+                    datasets: [{
+                        data: [vA, vB],
+                        backgroundColor: [gradientA, gradientB],
+                        borderColor: ['#3b82f6', '#10b981'],
+                        borderWidth: 2,
+                        borderRadius: 12,
+                        barThickness: 'flex',
+                        maxBarThickness: 100
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { family: 'Noto Sans TC', size: 14 },
+                            bodyFont: { family: 'Noto Sans TC', size: 16, weight: 'bold' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return '$ ' + context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                                }
+                            }
+                        }
+                    },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: '#e2e8f0', borderDash: [5, 5] }, 
+                            ticks: { 
+                                color: '#94a3b8',
+                                font: { family: 'Noto Sans TC' },
+                                callback: function(value) { return '$' + value/1000 + 'k'; }
+                            },
+                            border: { display: false }
+                        }, 
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: '#334155', font: { weight: 'bold', size: 14, family: 'Noto Sans TC' } },
+                            border: { display: false }
+                        } 
+                    }
+                }
+            });
+            
+            // 平滑捲動到結果區
+            setTimeout(() => {
+                window.scrollTo({ top: document.getElementById('resultSection').offsetTop - 40, behavior: 'smooth' });
+            }, 300);
+        }
+    </script>
+    </body>
+</html>
